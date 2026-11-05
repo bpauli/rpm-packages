@@ -1,0 +1,77 @@
+name: Update RPM Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: "RPM package name (e.g., zwift-bootstrap)"
+        required: true
+        type: string
+      tag:
+        description: "Release tag (e.g., v0.5.1)"
+        required: true
+        type: string
+      repository:
+        description: "Source repository (e.g., bpauli/zwift-bootstrap)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rpm-repository
+  cancel-in-progress: false
+
+jobs:
+  update-package:
+    runs-on: ubuntu-latest
+    # rpmsign and createrepo_c of the current Fedora, the same rpm that installs the packages.
+    container: fedora:latest
+    steps:
+      # git must be present before the checkout, or actions/checkout gets the files without .git.
+      - name: Install tools
+        run: dnf install -y git-core rpm-sign createrepo_c gnupg2 gh
+
+      - name: Checkout rpm-packages
+        uses: actions/checkout@v4
+        with:
+          # The branch tip at run time, not the commit of the dispatch, so that a
+          # queued run builds on the push of the run before it.
+          ref: main
+
+      - name: Setup Git
+        run: |
+          # The checkout belongs to the runner user, not to root in the container.
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Import signing key
+        env:
+          RPM_GPG_PRIVATE_KEY: ${{ secrets.RPM_GPG_PRIVATE_KEY }}
+        run: printf '%s\n' "$RPM_GPG_PRIVATE_KEY" | gpg --batch --import
+
+      - name: Download and verify the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE: ${{ inputs.package }}
+          TAG: ${{ inputs.tag }}
+          REPO: ${{ inputs.repository }}
+        run: scripts/fetch-package.sh "${PACKAGE}" "${TAG}" "${REPO}"
+
+      - name: Sign the packages and rebuild the metadata
+        run: scripts/update-repo.sh
+
+      - name: Commit and push
+        env:
+          PACKAGE: ${{ inputs.package }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          git add packages repodata
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "Update ${PACKAGE} to ${TAG}"
+          git push
