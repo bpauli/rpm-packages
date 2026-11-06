@@ -1,6 +1,6 @@
 # rpm-packages
 
-Signed DNF repository for Fedora, updated on each release via GitHub Actions. It is served from GitHub Pages at https://bpauli.de/rpm-packages.
+Signed DNF repository for Fedora and AlmaLinux, updated on each release via GitHub Actions. It is served from GitHub Pages at https://bpauli.de/rpm-packages.
 
 ## Packages
 
@@ -8,7 +8,7 @@ Signed DNF repository for Fedora, updated on each release via GitHub Actions. It
 
 ## Use the repository
 
-Supported systems: Fedora. zwift-bootstrap is available for x86_64.
+Supported systems: Fedora 41 and later, AlmaLinux 10. zwift-bootstrap is available for x86_64. Red Hat Enterprise Linux 9 and its rebuilds cannot install zwift-bootstrap, because their glibc 2.34 is too old.
 
 ```sh
 sudo curl -fsSL -o /etc/yum.repos.d/bpauli.repo https://bpauli.de/rpm-packages/bpauli.repo
